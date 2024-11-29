@@ -1,0 +1,169 @@
+## SNOW ALGAE 18S SEQUENCE ANALYSIS CODE ##
+
+# Run using qiime2, version 2023.9.2
+## Our sequences are Illumina MiSeq 2 x 250 bp
+
+## The snow algae samples are already demultiplexed (sorted by sample), so we can skip the first step of demultiplexing the .fastq files
+
+## First step: Import the sequence data to qiime2
+## Follow instructions for “paired-end demultiplexed fastq”
+
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path SnowAlgae2023_fastq \
+  --input-format CasavaOneEightSingleLanePerSampleDirFmt \
+  --output-path demux-paired-end.qza
+
+## Summarize and look at sequence files:
+
+qiime demux summarize \
+  --i-data demux-paired-end.qza \
+  --o-visualization demux-paired-end.qzv
+
+## To view summary, type:
+qiime tools view demux-paired-end.qzv
+
+## Also contains interactive quality score plot, which you can use to determine where to trim reads:
+
+# Forward read quality score drops below 30 after base pair 250
+# Reverse read 	quality score drops below 30 after base pair 240
+
+###########################################################
+
+## Next step: Denoising, trimming and merging sequence pairs with DADA2
+
+## Use DATA2 to filter out noisy / error sequences, remove chimeric sequences, remove singletons,
+## join denoised paired-end reads, and then dereplicate those sequences (dereplication reduces file size/memory requirements in downstream steps)
+
+# Denoise and generate amplicon sequence variant tables w/DADA2:
+(Note: adjust p-trim based on the “demux-paired-end.qzv” interactive quality plot. 
+Zoom in and look at quality… at what base pair does quality drop off?)
+
+# Set   --p-n-threads 0  to use all computer cores and make it run faster 
+# Set trim left to # base pairs that equals the primer sequence length (in this case, 20 bp)
+# Note: Paired-end sequences that successfully join will typically be variable in length
+
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux-paired-end.qza \
+  --p-trim-left-f 20 \
+  --p-trim-left-r 20 \
+  --p-trunc-len-f 250 \
+  --p-trunc-len-r 240 \
+  --p-n-threads 0  \
+  --o-representative-sequences dada2-rep-seqs.qza \
+  --o-denoising-stats dada2-denoising-stats.qza \
+  --o-table dada2-table.qza
+
+## Next, summarize the dada2 ASV table results:
+
+qiime feature-table summarize \
+  --i-table dada2-table.qza \
+  --o-visualization dada2-table.qzv \
+  --m-sample-metadata-file Snow_algae_2023_mapping.txt
+
+## To view summary, type:
+qiime tools view dada2-table.qzv
+
+qiime feature-table tabulate-seqs \
+  --i-data dada2-rep-seqs.qza \
+  --o-visualization dada2-rep-seqs.qzv
+
+## To view summary, type:
+qiime tools view dada2-rep-seqs.qzv
+
+###########################################################
+
+## TAXONOMY ASSIGNMENT
+
+# We will assign taxonomy using a custom taxonomy database, made with the program rescript (within qiime2)
+# This program pulls sequences from NCBI and makes a custom taxonomy database based on any NCBI search
+
+## Check out this tutorial on rescript: https://github.com/HuttonICS/blue-carbon-db?search=1
+
+## To build custom database, search in NCBI nucleotide for:
+snow[All Fields] AND "Chlorophyta"[Organism] AND 18S[All Fields] 
+
+## Create a reference taxonomy dataset with rescript (inside the folder “Taxonomy_classifier”)
+## RESCRIPt compiles sequence databases and taxonomy classifiers from NCBI Genbank
+## Uses NCBI Enterez search terms:
+	Entrez Search Field: Organism [ORGN]
+	Entrez Search Field: Accession Number [ACCN] (uses a : to get a range of accession #s)
+	Note - OR224441:OR224477[ACCN] are all of the Rosetta 18S sets from Casey’s paper (Actually, it works better to use --m-accession-ids-file)
+	Note - AND Finds documents that contain terms on both sides of the operator terms, the intersection of both searches
+	Note - OR Finds documents that contain either term, the union of both searches
+
+qiime rescript get-ncbi-data \
+    --p-query 'snow[All Fields] AND "Chlorophyta"[Organism] AND 18S[All Fields] OR "Chlainomonas"[Organism] OR "Chloromonas"[Organism] OR "Rosetta"[Organism] OR "Ochromonas"[Organism] OR "Sanguina"[Organism] OR "Haematococcus"[Organism] OR "Chrysophyceae"[Organism] OR "Cercozoa"[Organism] OR "Gymnosperma"[Organism] AND 18S[All Fields] OR "Granisotoma"[Organism] OR "Chionaster"[Organism] OR "Mesochytriales"[Organism] OR "Chytridiomycota"[Organism] OR "Chrysamoeba"[Organism] OR "Phenoliferia"[Organism] OR "Cryptosporidium"[Organism] OR "Perkinsea"[Organism] OR "Perisincirra"[Organism] OR "Zerconidae"[Organism] OR "Amoebidium"[Organism] OR "Desoria"[Organism] AND 18S[All Fields]' \
+    --m-accession-ids-file Rosetta_18S_accessions.txt \
+    --o-sequences Taxonomy_classifier/Custom-refseqs-unfiltered.qza \
+    --o-taxonomy Taxonomy_classifier/Custom-refseqs-taxonomy-unfiltered.qza
+
+## Note, the current NCBI search list yields 13,111 sequences!
+
+## Next, dereplicate the taxonomy database (remove duplicate sequences):
+
+qiime rescript dereplicate \
+--i-sequences Taxonomy_classifier/Custom-refseqs-unfiltered.qza  \
+--i-taxa Taxonomy_classifier/Custom-refseqs-taxonomy-unfiltered.qza \
+--p-mode 'uniq' \
+--p-threads 8 \
+--o-dereplicated-sequences Taxonomy_classifier/Custom-refseqs-derep.qza \
+--o-dereplicated-taxa Taxonomy_classifier/Custom-refseqs-taxonomy-derep.qza
+
+## Next,  train the classifier only on the regions targeted by your primers:
+
+## These are the 18S primers used for this project:
+	# The V4 region (418-420 basepairs) of the small subunit ribosomal gene (18S) 
+	# Forward primer 5′-CCAGCA(G/C)C(C/T)GCGGTAATTCC-3′ (total # base pairs = 20)
+	# Reverse primer 5′-ACTTTCGTTCTTGAT(C/T)(A/G)A-3′ (total # base pairs = 18)
+	# Note (G/C) = S, (C/T) = Y, (A/G) = R
+
+qiime feature-classifier extract-reads \
+  --i-sequences Taxonomy_classifier/Custom-refseqs-derep.qza \
+  --p-f-primer CCAGCASCYGCGGTAATTCC \
+  --p-r-primer ACTTTCGTTCTTGATYRA \
+  --p-min-length 200 \
+  --p-max-length 420 \
+  --o-reads Taxonomy_classifier/Custom-refseqs-derep-trimmed.qza
+
+## Finally, train a Native Bayes classifier as follows, using the reference reads and taxonomy
+qiime feature-classifier fit-classifier-naive-bayes \
+  --i-reference-reads Taxonomy_classifier/Custom-refseqs-derep-trimmed.qza \
+  --i-reference-taxonomy Taxonomy_classifier/Custom-refseqs-taxonomy-derep.qza \
+  --o-classifier Taxonomy_classifier/Custom-taxonomy-classifier.qza
+
+
+###########################################################
+
+## Next, assign taxonomy to your sequences
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier Taxonomy_classifier/Custom-taxonomy-classifier.qza \
+  --i-reads dada2-rep-seqs.qza \
+  --o-classification Taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file Taxonomy.qza \
+  --o-visualization Taxonomy.qzv
+
+## To view summary, type:
+qiime tools view Taxonomy.qzv
+
+###########################################################
+
+## Finally, export ASV table and taxonomy table to import into R for graphing & analysis
+
+### EXPORT FINAL ASV TABLE
+
+## Export ASV Table
+qiime tools export \
+  --input-path dada2-table.qza \
+  --output-path ASV_table
+
+## Convert biom to tsv
+biom convert -i ASV_table/feature-table.biom -o ASV_table/feature-table.tsv --to-tsv
+
+## Export taxonomy table
+qiime tools export \
+  --input-path Taxonomy.qza \
+  --output-path ASV_table
