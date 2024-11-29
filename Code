@@ -88,12 +88,18 @@ snow[All Fields] AND "Chlorophyta"[Organism] AND 18S[All Fields]
 ## Uses NCBI Enterez search terms:
 	Entrez Search Field: Organism [ORGN]
 	Entrez Search Field: Accession Number [ACCN] (uses a : to get a range of accession #s)
-	Note - OR224441:OR224477[ACCN] are all of the Rosetta 18S sets from Casey’s paper (Actually, it works better to use --m-accession-ids-file)
+	Used "--m-accession-ids-file" to access all of the Rosetta sequences from Engstrom et al. 2024
 	Note - AND Finds documents that contain terms on both sides of the operator terms, the intersection of both searches
 	Note - OR Finds documents that contain either term, the union of both searches
 
 qiime rescript get-ncbi-data \
-    --p-query 'snow[All Fields] AND "Chlorophyta"[Organism] AND 18S[All Fields] OR "Chlainomonas"[Organism] OR "Chloromonas"[Organism] OR "Rosetta"[Organism] OR "Ochromonas"[Organism] OR "Sanguina"[Organism] OR "Haematococcus"[Organism] OR "Chrysophyceae"[Organism] OR "Cercozoa"[Organism] OR "Gymnosperma"[Organism] AND 18S[All Fields] OR "Granisotoma"[Organism] OR "Chionaster"[Organism] OR "Mesochytriales"[Organism] OR "Chytridiomycota"[Organism] OR "Chrysamoeba"[Organism] OR "Phenoliferia"[Organism] OR "Cryptosporidium"[Organism] OR "Perkinsea"[Organism] OR "Perisincirra"[Organism] OR "Zerconidae"[Organism] OR "Amoebidium"[Organism] OR "Desoria"[Organism] AND 18S[All Fields]' \
+    --p-query 'snow[All Fields] AND "Chlorophyta"[Organism] AND 18S[All Fields] OR "Chlainomonas"[Organism]
+OR "Chloromonas"[Organism] OR "Rosetta"[Organism] OR "Ochromonas"[Organism] OR "Sanguina"[Organism]
+OR "Haematococcus"[Organism] OR "Chrysophyceae"[Organism] OR "Cercozoa"[Organism] OR "Gymnosperma"[Organism]
+AND 18S[All Fields] OR "Granisotoma"[Organism] OR "Chionaster"[Organism] OR "Mesochytriales"[Organism]
+OR "Chytridiomycota"[Organism] OR "Chrysamoeba"[Organism] OR "Phenoliferia"[Organism] OR "Cryptosporidium"[Organism]
+OR "Perkinsea"[Organism] OR "Perisincirra"[Organism] OR "Zerconidae"[Organism] OR "Amoebidium"[Organism]
+OR "Desoria"[Organism] AND 18S[All Fields]' \
     --m-accession-ids-file Rosetta_18S_accessions.txt \
     --o-sequences Taxonomy_classifier/Custom-refseqs-unfiltered.qza \
     --o-taxonomy Taxonomy_classifier/Custom-refseqs-taxonomy-unfiltered.qza
