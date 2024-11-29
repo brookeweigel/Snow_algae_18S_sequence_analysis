@@ -9,5 +9,5 @@ DNA sequences were analyzed in QIIME2, version 2023.9.2 (https://qiime2.org/) (B
 
 # These are the 18S primers used for this project:
   The V4 region (418-420 basepairs) of the small subunit ribosomal gene (18S) 
-  <br /> Forward primers 454FWD1 5′-CCAGCA(G/C)C(C/T)GCGGTAATTCC-3′
-  <br /> Reverse primers TAReukREV3 5′-ACTTTCGTTCTTGAT(C/T)(A/G)A-3′
+  <br /> Forward primer:  454FWD1 5′-CCAGCA(G/C)C(C/T)GCGGTAATTCC-3′
+  <br /> Reverse primer:  TAReukREV3 5′-ACTTTCGTTCTTGAT(C/T)(A/G)A-3′
